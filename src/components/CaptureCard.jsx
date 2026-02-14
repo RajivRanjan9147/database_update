@@ -1,8 +1,7 @@
 
-
 import React, { useState, useEffect } from 'react';
 import { fetchCaptureItems, createCaptureItem, createModule, fetchOcrDetectionModels, fetchOcrRecognitionModels, fetchDetectionModels, fetchModulesByCaptureId } from '../services/api';
-import { Plus, Loader2, Check, X } from 'lucide-react';
+import { Plus, Loader2, Check, X, Settings } from 'lucide-react';
 
 const CaptureCard = ({ capture, variantId, partId }) => {
   const [items, setItems] = useState([]);
@@ -12,28 +11,37 @@ const CaptureCard = ({ capture, variantId, partId }) => {
   const [availableModules, setAvailableModules] = useState([]);
   
   const [loading, setLoading] = useState(false);
-  const [adding, setAdding] = useState(false);
-  const [addingModule, setAddingModule] = useState(false);
+  const [addingIndex, setAddingIndex] = useState(false); // Renamed from adding for clarity
+  
+  // Phase 1: Create Module State
+  const [creatingModule, setCreatingModule] = useState(false);
+  const [newModuleConfig, setNewModuleConfig] = useState({
+    order: 1,
+    type: 'OCR',
+    detectionModel: '',
+    recognitionModel: ''
+  });
+
+  // Phase 2: Configure Module State
+  const [configuringModule, setConfiguringModule] = useState(false);
+  const [selectedModuleId, setSelectedModuleId] = useState('');
+  const [moduleEntry, setModuleEntry] = useState({
+    value: '',
+    optionKey: '',
+    optionLabel: '',
+    classValue: '',
+    matchType: 'exact',
+    prefix: '',
+    suffix: '',
+    masterKey: '',
+    isUserSelectable: true
+  });
+
   const [newItem, setNewItem] = useState({
     index: 0,
     regulation: '',
     drawing: '',
     entryType: ''
-  });
-  const [newModule, setNewModule] = useState({
-    order: 1,
-    type: 'OCR',
-    detectionModel: '',
-    recognitionModel: '',
-    matchType: 'exact',
-    value: '',
-    optionKey: '',
-    optionLabel: '',
-    isUserSelectable: true,
-    prefix: '',
-    suffix: '',
-    masterKey: '',
-    classValue: ''
   });
 
   useEffect(() => {
@@ -41,22 +49,23 @@ const CaptureCard = ({ capture, variantId, partId }) => {
   }, [capture.id]);
 
   useEffect(() => {
-    if (addingModule) {
-        if (newModule.type === 'OCR') {
+    if (creatingModule) {
+        if (newModuleConfig.type === 'OCR') {
             loadOcrModels();
-        } else if (newModule.type === 'Detection') {
+        } else if (newModuleConfig.type === 'Detection') {
             loadDetectionModels();
         }
     }
-  }, [addingModule, newModule.type]);
+  }, [creatingModule, newModuleConfig.type]);
 
   useEffect(() => {
-    if (addingModule && capture.id) {
+    // Reload modules when opening Configure or after creating new module
+    if ((configuringModule || creatingModule) && capture.id) {
         fetchModulesByCaptureId(capture.id).then(data => {
             setAvailableModules(Array.isArray(data) ? data : []);
         });
     }
-  }, [addingModule, capture.id]);
+  }, [configuringModule, creatingModule, capture.id]);
 
   const loadItems = async () => {
     setLoading(true);
@@ -71,8 +80,6 @@ const CaptureCard = ({ capture, variantId, partId }) => {
   };
 
   const loadOcrModels = async () => {
-      // Avoid refetching if already loaded? Or just always fetch to be safe.
-      // Simple cache check
       if (ocrDetectionModels.length === 0) {
           const detData = await fetchOcrDetectionModels();
           setOcrDetectionModels(Array.isArray(detData) ? detData : []);
@@ -94,63 +101,121 @@ const CaptureCard = ({ capture, variantId, partId }) => {
     try {
       await createCaptureItem({ ...newItem, variantId, partId });
       loadItems(); 
-      setAdding(false);
+      setAddingIndex(false);
       setNewItem({ index: 0, regulation: '', drawing: '', entryType: '' });
     } catch (error) {
       console.error("Failed to create item", error);
     }
   };
 
-  const handleCreateModule = async () => {
-    try {
-       const payload = { 
-           captureId: capture.id,
-           order: newModule.order,
-           type: newModule.type,
-           match_type: newModule.matchType,
-           prefix: newModule.prefix,
-           suffix: newModule.suffix,
-           master_key: newModule.masterKey
-       };
-       
-       if (newModule.type === 'OCR') {
-           // OCR-specific fields
-           payload.value = newModule.value;
-           payload.option_key = newModule.optionKey;
-           payload.option_label = newModule.optionLabel;
-           payload.is_user_selectable = newModule.isUserSelectable;
-           
-           if (newModule.detectionModel) payload.detection_model_id = newModule.detectionModel;
-           if (newModule.recognitionModel) payload.recognition_model_id = newModule.recognitionModel;
-       } else if (newModule.type === 'Detection') {
-           // Detection-specific fields
-           payload.class = newModule.classValue;
-           
-           if (newModule.detectionModel) payload.detection_model_id = newModule.detectionModel;
-       }
+  // Phase 1: Create Module Logic
+  const handleCreateModuleConfig = async () => {
+      try {
+          const payload = {
+              captureId: capture.id,
+              order: newModuleConfig.order,
+              type: newModuleConfig.type,
+              // Default/Empty values for entry fields since this is just "Creating Structure"
+              match_type: 'exact',
+              prefix: '',
+              suffix: '',
+              master_key: '',
+              value: '',
+              option_key: '',
+              option_label: '',
+              is_user_selectable: true,
+              class: ''
+          };
 
-       await createModule(payload);
-       setAddingModule(false);
-       setNewModule({ 
-           order: 1, 
-           type: 'OCR', 
-           detectionModel: '', 
-           recognitionModel: '',
-           matchType: 'exact',
-           value: '',
-           optionKey: '',
-           optionLabel: '',
-           isUserSelectable: true,
-           prefix: '',
-           suffix: '',
-           masterKey: '',
-           classValue: ''
-       });
-       alert("Module added successfully!");
-    } catch (error) {
-       console.error("Failed to create module", error);
-       alert("Failed to create module");
-    }
+          if (newModuleConfig.type === 'OCR') {
+             if (newModuleConfig.detectionModel) payload.detection_model_id = newModuleConfig.detectionModel;
+             if (newModuleConfig.recognitionModel) payload.recognition_model_id = newModuleConfig.recognitionModel;
+          } else if (newModuleConfig.type === 'Detection') {
+             if (newModuleConfig.detectionModel) payload.detection_model_id = newModuleConfig.detectionModel;
+          }
+
+          await createModule(payload);
+          alert("Module created successfully!");
+          setCreatingModule(false);
+          // Refresh modules list
+          fetchModulesByCaptureId(capture.id).then(data => setAvailableModules(Array.isArray(data) ? data : []));
+      } catch (error) {
+          console.error("Failed to create module config", error);
+          alert("Failed to create module");
+      }
+  };
+
+  // Phase 2: Add Entry to Module Logic
+  const handleAddModuleEntry = async () => {
+      if (!selectedModuleId) {
+          alert("Please select a module first.");
+          return;
+      }
+      
+      const selectedModule = availableModules.find(m => m.id == selectedModuleId);
+      if (!selectedModule) return;
+
+      try {
+          // Construct payload using Selected Module's config + New Entry Data
+          const payload = {
+              captureId: capture.id,
+              order: selectedModule.order,
+              type: selectedModule.type,
+              detection_model_id: selectedModule.detection_model_id,
+              recognition_model_id: selectedModule.recognition_model_id,
+              
+              match_type: moduleEntry.matchType,
+              prefix: moduleEntry.prefix,
+              suffix: moduleEntry.suffix,
+              master_key: moduleEntry.masterKey,
+          };
+
+          if (selectedModule.type === 'OCR') {
+              payload.value = moduleEntry.value;
+              payload.option_key = moduleEntry.optionKey;
+              payload.option_label = moduleEntry.optionLabel;
+              payload.is_user_selectable = moduleEntry.isUserSelectable;
+          } else if (selectedModule.type === 'Detection') {
+              payload.class = moduleEntry.classValue;
+          }
+
+          await createModule(payload);
+          alert("Entry added to module successfully!");
+          
+          // Reset entry fields but keep module selected for faster entry addition
+          setModuleEntry({
+            value: '',
+            optionKey: '',
+            optionLabel: '',
+            classValue: '',
+            matchType: 'exact',
+            prefix: '',
+            suffix: '',
+            masterKey: '',
+            isUserSelectable: true
+          });
+      } catch (error) {
+          console.error("Failed to add entry", error);
+          alert("Failed to add entry");
+      }
+  };
+
+  const handleModuleSelection = (e) => {
+      const id = e.target.value;
+      setSelectedModuleId(id);
+      
+      // Optionally pre-fill some common fields from the selected module if desired
+      // But for now we keep them blank or default as per "Add Entry" logic
+      const selected = availableModules.find(m => m.id == id);
+      if (selected) {
+         setModuleEntry(prev => ({
+             ...prev,
+             matchType: selected.match_type || 'exact',
+             prefix: selected.prefix || '',
+             suffix: selected.suffix || '',
+             masterKey: selected.master_key || ''
+         }));
+      }
   };
 
   return (
@@ -167,54 +232,75 @@ const CaptureCard = ({ capture, variantId, partId }) => {
         <div className="flex gap-2">
             <button 
                className="p-1 hover:bg-gray-200 rounded text-purple-600 transition-colors"
-               onClick={() => setAddingModule(true)}
-               title="Add Module"
+               onClick={() => {
+                   setCreatingModule(true);
+                   setConfiguringModule(false);
+               }}
+               title="Create Module"
             >
                <Plus size={16} />
+               <span className="text-xs font-medium ml-1">Create Module</span>
+            </button>
+            <button 
+               className="p-1 hover:bg-gray-200 rounded text-teal-600 transition-colors"
+               onClick={() => {
+                   setConfiguringModule(true);
+                   setCreatingModule(false);
+                   // Load modules if not already loaded
+                   if (availableModules.length === 0 && capture.id) {
+                       fetchModulesByCaptureId(capture.id).then(data => setAvailableModules(Array.isArray(data) ? data : []));
+                   }
+               }}
+               title="Configure Module"
+            >
+               <Settings size={16} />
+               <span className="text-xs font-medium ml-1">Configure</span>
             </button>
             <button 
                className="p-1 hover:bg-gray-200 rounded text-blue-600 transition-colors"
-               onClick={() => setAdding(true)}
+               onClick={() => setAddingIndex(true)}
                title="Add Item (Index)"
             >
-               Add Index
+               <Plus size={16} />
+               <span className="text-xs font-medium ml-1">Index</span>
             </button>
         </div>
       </div>
 
-      {addingModule && (
+      {/* Phase 1: Create Module Modal/Form */}
+      {creatingModule && (
         <div className="bg-purple-50 p-3 rounded border border-purple-200 mb-3 animate-in fade-in zoom-in-95">
-           <h5 className="text-xs font-semibold text-purple-800 mb-2">Add Module</h5>
-           <div className="grid grid-cols-2 gap-2 mb-2">
+           <h5 className="text-xs font-semibold text-purple-800 mb-2 border-b border-purple-200 pb-1">Phase 1: Create Module</h5>
+           <div className="grid grid-cols-2 gap-2 mb-2 p-2 bg-white rounded border border-purple-100 shadow-sm">
               <div>
                  <label className="text-xs font-medium text-gray-600 block mb-1">Order</label>
                  <input 
                    type="number"
                    className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500"
-                   value={newModule.order}
-                   onChange={e => setNewModule({...newModule, order: parseInt(e.target.value) || 0})}
+                   value={newModuleConfig.order}
+                   onChange={e => setNewModuleConfig({...newModuleConfig, order: parseInt(e.target.value) || 0})}
                  />
               </div>
               <div>
                  <label className="text-xs font-medium text-gray-600 block mb-1">Type</label>
                  <select 
                    className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500 bg-white"
-                   value={newModule.type}
-                   onChange={e => setNewModule({...newModule, type: e.target.value})}
+                   value={newModuleConfig.type}
+                   onChange={e => setNewModuleConfig({...newModuleConfig, type: e.target.value})}
                  >
                     <option value="OCR">OCR</option>
                     <option value="Detection">Detection</option>
                  </select>
               </div>
               
-              {newModule.type === 'OCR' && (
+              {newModuleConfig.type === 'OCR' && (
                   <>
                     <div className="col-span-1">
                         <label className="text-xs font-medium text-gray-600 block mb-1">Detection Model</label>
                         <select 
                             className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500 bg-white"
-                            value={newModule.detectionModel}
-                            onChange={e => setNewModule({...newModule, detectionModel: e.target.value})}
+                            value={newModuleConfig.detectionModel}
+                            onChange={e => setNewModuleConfig({...newModuleConfig, detectionModel: e.target.value})}
                         >
                             <option value="">Select Detection Model</option>
                             {ocrDetectionModels.map(m => (
@@ -226,8 +312,8 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                         <label className="text-xs font-medium text-gray-600 block mb-1">Recognition Model</label>
                         <select 
                             className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500 bg-white"
-                            value={newModule.recognitionModel}
-                            onChange={e => setNewModule({...newModule, recognitionModel: e.target.value})}
+                            value={newModuleConfig.recognitionModel}
+                            onChange={e => setNewModuleConfig({...newModuleConfig, recognitionModel: e.target.value})}
                         >
                             <option value="">Select Recognition Model</option>
                             {ocrRecognitionModels.map(m => (
@@ -251,13 +337,13 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                   </>
               )}
 
-              {newModule.type === 'Detection' && (
+              {newModuleConfig.type === 'Detection' && (
                   <div className="col-span-2">
                       <label className="text-xs font-medium text-gray-600 block mb-1">Detection Model</label>
                       <select 
                           className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500 bg-white"
-                          value={newModule.detectionModel}
-                          onChange={e => setNewModule({...newModule, detectionModel: e.target.value})}
+                          value={newModuleConfig.detectionModel}
+                          onChange={e => setNewModuleConfig({...newModuleConfig, detectionModel: e.target.value})}
                       >
                           <option value="">Select Detection Model</option>
                           {detectionModels.map(m => (
@@ -266,137 +352,152 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                       </select>
                   </div>
               )}
-              
-             {newModule.type === 'Detection' && (
-                <div className="col-span-2">
-                    <label className="text-xs font-medium text-gray-600 block mb-1">Choose Module</label>
-                    <select 
-                        className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500 bg-white"
-                        onChange={(e) => console.log("Selected module:", e.target.value)}
-                    >
-                        <option value="">Choose Module</option>
-                        {availableModules.map(m => (
-                            <option key={m.id} value={m.id}>{m.order} - {m.type}</option>
-                        ))}
-                    </select>
-                </div>
-             )}
-
-              {/* OCR-specific fields */}
-              {newModule.type === 'OCR' && (
-                  <>
-                      <div className="col-span-2">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Value</label>
-                          <input 
-                              type="text"
-                              className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500"
-                              value={newModule.value}
-                              onChange={e => setNewModule({...newModule, value: e.target.value})}
-                              placeholder="Enter value"
-                          />
-                      </div>
-
-                      <div className="col-span-1">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Option Key</label>
-                          <input 
-                              type="text"
-                              className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500"
-                              value={newModule.optionKey}
-                              onChange={e => setNewModule({...newModule, optionKey: e.target.value})}
-                              placeholder="Option key"
-                          />
-                      </div>
-
-                      <div className="col-span-1">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Option Label</label>
-                          <input 
-                              type="text"
-                              className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500"
-                              value={newModule.optionLabel}
-                              onChange={e => setNewModule({...newModule, optionLabel: e.target.value})}
-                              placeholder="Option label"
-                          />
-                      </div>
-                  </>
-              )}
-
-              {/* Detection-specific fields */}
-              {newModule.type === 'Detection' && (
-                  <div className="col-span-2">
-                      <label className="text-xs font-medium text-gray-600 block mb-1">Class</label>
-                      <input 
-                          type="text"
-                          className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500"
-                          value={newModule.classValue}
-                          onChange={e => setNewModule({...newModule, classValue: e.target.value})}
-                          placeholder="Enter class"
-                      />
-                  </div>
-              )}
-
-              {/* OCR-only: Prefix and Suffix */}
-              {newModule.type === 'OCR' && (
-                  <>
-                      <div className="col-span-1">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Prefix</label>
-                          <input 
-                              type="text"
-                              className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500"
-                              value={newModule.prefix}
-                              onChange={e => setNewModule({...newModule, prefix: e.target.value})}
-                              placeholder="Prefix"
-                          />
-                      </div>
-
-                      <div className="col-span-1">
-                          <label className="text-xs font-medium text-gray-600 block mb-1">Suffix</label>
-                          <input 
-                              type="text"
-                              className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500"
-                              value={newModule.suffix}
-                              onChange={e => setNewModule({...newModule, suffix: e.target.value})}
-                              placeholder="Suffix"
-                          />
-                      </div>
-                  </>
-              )}
-
-              <div className="col-span-2">
-                  <label className="text-xs font-medium text-gray-600 block mb-1">Master Key</label>
-                  <input 
-                      type="text"
-                      className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500"
-                      value={newModule.masterKey}
-                      onChange={e => setNewModule({...newModule, masterKey: e.target.value})}
-                      placeholder="Enter master key"
-                  />
-              </div>
-
-              {/* OCR-only: Is User Selectable */}
-              {newModule.type === 'OCR' && (
-                  <div className="col-span-2 flex items-center gap-2">
-                      <input 
-                          type="checkbox"
-                          id="isUserSelectable"
-                          className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500"
-                          checked={newModule.isUserSelectable}
-                          onChange={e => setNewModule({...newModule, isUserSelectable: e.target.checked})}
-                      />
-                      <label htmlFor="isUserSelectable" className="text-xs font-medium text-gray-600">
-                          Is User Selectable
-                      </label>
-                  </div>
-              )}
-
            </div>
+           
            <div className="flex gap-2 justify-end">
-             <button onClick={() => setAddingModule(false)} className="p-1 text-gray-400 hover:text-gray-600"><X size={16}/></button>
-             <button onClick={handleCreateModule} className="p-1 text-purple-600 hover:text-purple-800"><Check size={16}/></button>
+             <button onClick={() => setCreatingModule(false)} className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700">Cancel</button>
+             <button onClick={handleCreateModuleConfig} className="px-3 py-1.5 text-xs bg-purple-600 hover:bg-purple-700 rounded text-white font-medium flex items-center gap-1">
+                <Check size={14}/> Create
+             </button>
           </div>
         </div>
       )}
 
-      {adding && (
+      {/* Phase 2: Configure Module (Add Entries) Form */}
+      {configuringModule && (
+        <div className="bg-teal-50 p-3 rounded border border-teal-200 mb-3 animate-in fade-in zoom-in-95">
+           <h5 className="text-xs font-semibold text-teal-800 mb-2 border-b border-teal-200 pb-1">Phase 2: Configure Module (Add Entries)</h5>
+           
+           {/* Section 1: Choose Module */}
+           <div className="mb-2 p-2 bg-white rounded border border-teal-100 shadow-sm">
+               <label className="text-xs font-medium text-teal-700 block mb-1">Select Module to Configure</label>
+               <select 
+                    className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500 bg-white"
+                    value={selectedModuleId}
+                    onChange={handleModuleSelection}
+               >
+                    <option value="">-- Choose Module --</option>
+                    {availableModules.map(m => (
+                        <option key={m.id} value={m.id}>
+                            Order {m.order}: {m.type} {m.detection_model_id ? `(Det: ${m.detection_model_id})` : ''}
+                        </option>
+                    ))}
+               </select>
+           </div>
+
+           {/* Section 2: Entry Fields (Only if module selected) */}
+           {selectedModuleId && (
+               <div className="p-2 bg-white rounded border border-teal-100 shadow-sm space-y-2">
+                   {/* Detection vs OCR fields based on selected module type */}
+                   {availableModules.find(m => m.id == selectedModuleId)?.type === 'OCR' && (
+                       <>
+                           <div className="grid grid-cols-2 gap-2">
+                               <div className="col-span-2">
+                                   <label className="text-xs font-medium text-gray-600 block mb-1">Value</label>
+                                   <input 
+                                       type="text"
+                                       className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                       value={moduleEntry.value}
+                                       onChange={e => setModuleEntry({...moduleEntry, value: e.target.value})}
+                                       placeholder="Enter value"
+                                   />
+                               </div>
+                               <div>
+                                   <label className="text-xs font-medium text-gray-600 block mb-1">Option Key</label>
+                                   <input 
+                                       type="text"
+                                       className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                       value={moduleEntry.optionKey}
+                                       onChange={e => setModuleEntry({...moduleEntry, optionKey: e.target.value})}
+                                       placeholder="Option key"
+                                   />
+                               </div>
+                               <div>
+                                   <label className="text-xs font-medium text-gray-600 block mb-1">Option Label</label>
+                                   <input 
+                                       type="text"
+                                       className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                       value={moduleEntry.optionLabel}
+                                       onChange={e => setModuleEntry({...moduleEntry, optionLabel: e.target.value})}
+                                       placeholder="Option label"
+                                   />
+                               </div>
+                           </div>
+                           
+                           {/* Common Config (can be overridden per entry) */}
+                           <div className="grid grid-cols-2 gap-2 border-t border-gray-100 pt-2 mt-2">
+                               <div>
+                                   <label className="text-xs font-medium text-gray-500 block mb-1">Prefix</label>
+                                   <input 
+                                       type="text"
+                                       className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                       value={moduleEntry.prefix}
+                                       onChange={e => setModuleEntry({...moduleEntry, prefix: e.target.value})}
+                                       placeholder="Prefix"
+                                   />
+                               </div>
+                               <div>
+                                   <label className="text-xs font-medium text-gray-500 block mb-1">Suffix</label>
+                                   <input 
+                                       type="text"
+                                       className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                       value={moduleEntry.suffix}
+                                       onChange={e => setModuleEntry({...moduleEntry, suffix: e.target.value})}
+                                       placeholder="Suffix"
+                                   />
+                               </div>
+                               <div className="col-span-2">
+                                   <label className="text-xs font-medium text-gray-500 block mb-1">Master Key</label>
+                                   <input 
+                                       type="text"
+                                       className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                       value={moduleEntry.masterKey}
+                                       onChange={e => setModuleEntry({...moduleEntry, masterKey: e.target.value})}
+                                       placeholder="Enter master key"
+                                   />
+                               </div>
+                               <div className="col-span-2 flex items-center gap-2">
+                                   <input 
+                                       type="checkbox"
+                                       id="entryUserSelectable"
+                                       className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                                       checked={moduleEntry.isUserSelectable}
+                                       onChange={e => setModuleEntry({...moduleEntry, isUserSelectable: e.target.checked})}
+                                   />
+                                   <label htmlFor="entryUserSelectable" className="text-xs font-medium text-gray-600">
+                                       Is User Selectable
+                                   </label>
+                               </div>
+                           </div>
+                       </>
+                   )}
+
+                   {availableModules.find(m => m.id == selectedModuleId)?.type === 'Detection' && (
+                       <div className="col-span-2">
+                          <label className="text-xs font-medium text-gray-600 block mb-1">Class</label>
+                          <input 
+                              type="text"
+                              className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                              value={moduleEntry.classValue}
+                              onChange={e => setModuleEntry({...moduleEntry, classValue: e.target.value})}
+                              placeholder="Enter class"
+                          />
+                      </div>
+                   )}
+                   
+                   <button onClick={handleAddModuleEntry} className="w-full mt-2 text-xs text-white bg-teal-600 hover:bg-teal-700 px-3 py-2 rounded font-medium flex items-center justify-center gap-1 transition-colors">
+                        <Plus size={14}/> Add Entry to Module
+                   </button>
+               </div>
+           )}
+
+           <div className="flex gap-2 justify-end mt-2 pt-2 border-t border-teal-200">
+             <button onClick={() => setConfiguringModule(false)} className="px-3 py-1.5 text-xs bg-gray-200 hover:bg-gray-300 rounded text-gray-700">Close</button>
+          </div>
+        </div>
+      )}
+
+      {addingIndex && (
         <div className="bg-white p-3 rounded border border-blue-200 mb-3 animate-in fade-in zoom-in-95">
           <div className="grid grid-cols-1 gap-2 mb-2">
             <div className="flex items-center gap-2">
@@ -429,7 +530,7 @@ const CaptureCard = ({ capture, variantId, partId }) => {
 
           </div>
           <div className="flex gap-2 justify-end">
-             <button onClick={() => setAdding(false)} className="p-1 text-gray-400 hover:text-gray-600"><X size={16}/></button>
+             <button onClick={() => setAddingIndex(false)} className="p-1 text-gray-400 hover:text-gray-600"><X size={16}/></button>
              <button onClick={handleCreateItem} className="p-1 text-blue-600 hover:text-blue-800"><Check size={16}/></button>
           </div>
         </div>
