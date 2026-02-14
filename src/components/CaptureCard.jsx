@@ -244,7 +244,7 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                         >
                             <option value="">Choose Module</option>
                             {availableModules.map(m => (
-                                <option key={m.id} value={m.id}>{m.order} - {m.type}</option>
+                                <option key={m.id} value={m.id}>{m.order} - {m.type} - {m.detection_model_name} - {m?.recognition_model_name}</option>
                             ))}
                         </select>
                     </div>
