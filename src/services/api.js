@@ -3,39 +3,39 @@ const API_URL = import.meta.env.VITE_API_URL;
 
 // Helper to extract data from response
 const extractData = (json) => {
-  if (Array.isArray(json)) return json;
-  if (json && Array.isArray(json.data)) return json.data;
-  return [];
+    if (Array.isArray(json)) return json;
+    if (json && Array.isArray(json.data)) return json.data;
+    return [];
 };
 
 export const fetchVariants = async () => {
-  try {
-    const response = await fetch(`${API_URL}/variants`);
-    if (!response.ok) {
-        console.warn(`Fetch variants failed with status: ${response.status}`);
-        return []; 
+    try {
+        const response = await fetch(`${API_URL}/variants`);
+        if (!response.ok) {
+            console.warn(`Fetch variants failed with status: ${response.status}`);
+            return [];
+        }
+        const json = await response.json();
+        return extractData(json);
+    } catch (error) {
+        console.warn("Fetch variants failed, returning empty list", error);
+        return [];
     }
-    const json = await response.json();
-    return extractData(json);
-  } catch (error) {
-    console.warn("Fetch variants failed, returning empty list", error);
-    return [];
-  }
 };
 
 export const createVariant = async (variantName) => {
-  try {
-    const response = await fetch(`${API_URL}/variants`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ variant_name: variantName }),
-    });
-    if (!response.ok) throw new Error('Failed to create variant');
-    return response.json();
-  } catch (e) {
-      console.error(e);
-      throw e;
-  }
+    try {
+        const response = await fetch(`${API_URL}/variants`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ variant_name: variantName }),
+        });
+        if (!response.ok) throw new Error('Failed to create variant');
+        return response.json();
+    } catch (e) {
+        console.error(e);
+        throw e;
+    }
 };
 
 export const deleteVariant = async (variantId) => {
@@ -48,25 +48,25 @@ export const deleteVariant = async (variantId) => {
 };
 
 export const fetchParts = async (variantId) => {
-  try {
-      const response = await fetch(`${API_URL}/parts/variant/${variantId}`);
-      if (!response.ok) return [];
-      const json = await response.json();
-      return extractData(json);
-  } catch (e) {
-      console.warn("Fetch parts failed", e);
-      return [];
-  }
+    try {
+        const response = await fetch(`${API_URL}/parts/variant/${variantId}`);
+        if (!response.ok) return [];
+        const json = await response.json();
+        return extractData(json);
+    } catch (e) {
+        console.warn("Fetch parts failed", e);
+        return [];
+    }
 };
 
 export const createPart = async (variantId, partName) => {
-  const response = await fetch(`${API_URL}/parts`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ variant_id: variantId, part_name: partName }),
-  });
-  if (!response.ok) throw new Error('Failed to create part');
-  return response.json();
+    const response = await fetch(`${API_URL}/parts`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ variant_id: variantId, part_name: partName }),
+    });
+    if (!response.ok) throw new Error('Failed to create part');
+    return response.json();
 };
 
 export const deletePart = async (partId) => {
@@ -78,58 +78,58 @@ export const deletePart = async (partId) => {
 };
 
 export const fetchCaptures = async (variant_id, part_id) => {
-  try {
-      const response = await fetch(`${API_URL}/captures/variant/${variant_id}/part/${part_id}`);
-      if (!response.ok) return [];
-      const json = await response.json();
-      return extractData(json);
-  } catch (e) {
-      console.warn("Fetch captures failed", e);
-      return [];
-  }
+    try {
+        const response = await fetch(`${API_URL}/captures/variant/${variant_id}/part/${part_id}`);
+        if (!response.ok) return [];
+        const json = await response.json();
+        return extractData(json);
+    } catch (e) {
+        console.warn("Fetch captures failed", e);
+        return [];
+    }
 };
 
 export const createCapture = async (variantId, partId, data) => {
-  let order = 1;
-  // If order is not provided in data, try to calculate it
-  if (!data || !data.order) {
-    try {
-       const existing = await fetchCaptures(variantId, partId);
-       if (existing && existing.length > 0) {
-          order = existing.length + 1;
-       }
-    } catch (e) { /* ignore */ }
-  } else {
-    order = data.order;
-  }
+    let order = 1;
+    // If order is not provided in data, try to calculate it
+    if (!data || !data.order) {
+        try {
+            const existing = await fetchCaptures(variantId, partId);
+            if (existing && existing.length > 0) {
+                order = existing.length + 1;
+            }
+        } catch (e) { /* ignore */ }
+    } else {
+        order = data.order;
+    }
 
-  const body = {
-      variant_id: variantId, 
-      part_id: partId,
-      order: order,
-      capture_name: data.captureName,
-  };
+    const body = {
+        variant_id: variantId,
+        part_id: partId,
+        order: order,
+        capture_name: data.captureName,
+    };
 
-  if (data) {
-      // Map user inputs to API payload
-      if (data.image !== undefined) body.image = data.image;
-      if (data.flag !== undefined) body.image_flag = data.flag;
-      
-      // Fallback for old boolean flag if needed (or just remove it if we are sure)
-      if (data.imageFlag !== undefined && data.flag === undefined) {
-          body.image_flag = data.imageFlag ? 1 : 0;
-      }
+    if (data) {
+        // Map user inputs to API payload
+        if (data.image !== undefined) body.image = data.image;
+        if (data.flag !== undefined) body.image_flag = data.flag;
 
-      if (data.captureName !== undefined) body.capture_name = data.captureName;
-  }
+        // Fallback for old boolean flag if needed (or just remove it if we are sure)
+        if (data.imageFlag !== undefined && data.flag === undefined) {
+            body.image_flag = data.imageFlag ? 1 : 0;
+        }
 
-  const response = await fetch(`${API_URL}/captures/create-by-variant-part-id`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  });
-  if (!response.ok) throw new Error('Failed to create capture');
-  return response.json();
+        if (data.captureName !== undefined) body.capture_name = data.captureName;
+    }
+
+    const response = await fetch(`${API_URL}/captures/create-by-variant-part-id`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+    if (!response.ok) throw new Error('Failed to create capture');
+    return response.json();
 };
 
 export const deleteCapture = async (captureId) => {
@@ -143,7 +143,7 @@ export const deleteCapture = async (captureId) => {
 export const fetchCaptureItems = async (captureId) => {
     try {
         const response = await fetch(`${API_URL}/captures/${captureId}/items`);
-        if (!response.ok) return []; 
+        if (!response.ok) return [];
         const json = await response.json();
         return extractData(json);
     } catch (e) {
@@ -164,7 +164,7 @@ export const createCaptureItem = async (data) => {
             item_index: data.index,
             entry_type: Number(data.entryType),
             extraction_type: data.extractionType,
-            
+
         }),
     });
     if (!response.ok) throw new Error('Failed to create capture item');
@@ -172,7 +172,7 @@ export const createCaptureItem = async (data) => {
 };
 
 export const createModule = async (data) => {
-    
+
     const payload = {
         capture_id: data.captureId,
         order: data.order,
@@ -205,6 +205,43 @@ export const createModule = async (data) => {
         body: JSON.stringify(payload),
     });
     if (!response.ok) throw new Error('Failed to create module');
+    return response.json();
+};
+
+export const addOcrGtEntry = async (data) => {
+    const payload = {
+        ocr_config_id: data.ocr_config_id,
+        value: data.value,
+        option_key: data.option_key,
+        option_label: data.option_label,
+        is_user_selectable: data.is_user_selectable,
+        match_type: data.match_type,
+        prefix: data.prefix,
+        suffix: data.suffix,
+        master_key: data.master_key,
+    };
+
+    const response = await fetch(`${API_URL}/ocr-configs/ocr-gt`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error('Failed to add OCR GT entry');
+    return response.json();
+};
+
+export const addDetectionClassEntry = async (data) => {
+    const payload = {
+        detection_config_id: data.detection_config_id,
+        class: data.class,
+    };
+
+    const response = await fetch(`${API_URL}/detection-configs/detection-class`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+    });
+    if (!response.ok) throw new Error('Failed to add detection class entry');
     return response.json();
 };
 

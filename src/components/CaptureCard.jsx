@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { fetchCaptureItems, createCaptureItem, createModule, fetchOcrDetectionModels, fetchOcrRecognitionModels, fetchDetectionModels, fetchModulesByCaptureId } from '../services/api';
+import { fetchCaptureItems, createCaptureItem, createModule, addOcrGtEntry, addDetectionClassEntry, fetchOcrDetectionModels, fetchOcrRecognitionModels, fetchDetectionModels, fetchModulesByCaptureId } from '../services/api';
 import { Plus, Loader2, Check, X, Settings } from 'lucide-react';
 
 const CaptureCard = ({ capture, variantId, partId }) => {
@@ -117,13 +117,6 @@ const CaptureCard = ({ capture, variantId, partId }) => {
               type: newModuleConfig.type,
               // Default/Empty values for entry fields since this is just "Creating Structure"
               match_type: 'exact',
-              prefix: '',
-              suffix: '',
-              master_key: '',
-              value: '',
-              option_key: '',
-              option_label: '',
-              is_user_selectable: true,
               class: ''
           };
 
@@ -156,30 +149,28 @@ const CaptureCard = ({ capture, variantId, partId }) => {
       if (!selectedModule) return;
 
       try {
-          // Construct payload using Selected Module's config + New Entry Data
-          const payload = {
-              captureId: capture.id,
-              order: selectedModule.order,
-              type: selectedModule.type,
-              detection_model_id: selectedModule.detection_model_id,
-              recognition_model_id: selectedModule.recognition_model_id,
-              
-              match_type: moduleEntry.matchType,
-              prefix: moduleEntry.prefix,
-              suffix: moduleEntry.suffix,
-              master_key: moduleEntry.masterKey,
-          };
-
           if (selectedModule.type === 'OCR') {
-              payload.value = moduleEntry.value;
-              payload.option_key = moduleEntry.optionKey;
-              payload.option_label = moduleEntry.optionLabel;
-              payload.is_user_selectable = moduleEntry.isUserSelectable;
+              const payload = {
+                  ocr_config_id: selectedModule.ocr_config_id,
+                  value: moduleEntry.value,
+                  option_key: moduleEntry.optionKey,
+                  option_label: moduleEntry.optionLabel,
+                  is_user_selectable: moduleEntry.isUserSelectable,
+                  match_type: moduleEntry.matchType,
+                  prefix: moduleEntry.prefix,
+                  suffix: moduleEntry.suffix,
+                  master_key: moduleEntry.masterKey,
+              };
+              await addOcrGtEntry(payload);
           } else if (selectedModule.type === 'Detection') {
-              payload.class = moduleEntry.classValue;
-          }
 
-          await createModule(payload);
+            console.log({selectedModule});
+              const payload = {
+                  detection_config_id: selectedModule.detection_config_id,
+                  class: moduleEntry.classValue,
+              };
+              await addDetectionClassEntry(payload);
+          }
           alert("Entry added to module successfully!");
           
           // Reset entry fields but keep module selected for faster entry addition
@@ -256,14 +247,7 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                <Settings size={16} />
                <span className="text-xs font-medium ml-1">Configure</span>
             </button>
-            <button 
-               className="p-1 hover:bg-gray-200 rounded text-blue-600 transition-colors"
-               onClick={() => setAddingIndex(true)}
-               title="Add Item (Index)"
-            >
-               <Plus size={16} />
-               <span className="text-xs font-medium ml-1">Index</span>
-            </button>
+            
         </div>
       </div>
 
@@ -322,7 +306,7 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                         </select>
                     </div>
                     
-                    <div className="col-span-2">
+                    {/* <div className="col-span-2">
                         <label className="text-xs font-medium text-gray-600 block mb-1">Choose Module</label>
                         <select 
                             className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-purple-500 bg-white"
@@ -333,7 +317,7 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                                 <option key={m.id} value={m.id}>{m.order} - {m.type} - {m.detection_model_name} - {m?.recognition_model_name}</option>
                             ))}
                         </select>
-                    </div>
+                    </div> */}
                   </>
               )}
 
@@ -379,7 +363,7 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                     <option value="">-- Choose Module --</option>
                     {availableModules.map(m => (
                         <option key={m.id} value={m.id}>
-                            Order {m.order}: {m.type} {m.detection_model_id ? `(Det: ${m.detection_model_id})` : ''}
+                            Order {m.order}: {m.type} {m.detection_model_name ? `(${m.detection_model_name})` : ''} {m.recognition_model_name ? `(${m.recognition_model_name})` : ''}
                         </option>
                     ))}
                </select>
