@@ -168,6 +168,10 @@ const CaptureCard = ({ capture, variantId, partId }) => {
               const payload = {
                   detection_config_id: selectedModule.detection_config_id,
                   class: moduleEntry.classValue,
+                  option_key: moduleEntry.optionKey,
+                  option_label: moduleEntry.optionLabel,
+                  is_user_selectable: moduleEntry.isUserSelectable,
+                  master_option_keys: moduleEntry.masterKey,
               };
               await addDetectionClassEntry(payload);
           }
@@ -457,6 +461,7 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                    )}
 
                    {availableModules.find(m => m.id == selectedModuleId)?.type === 'Detection' && (
+                       <>
                        <div className="col-span-2">
                           <label className="text-xs font-medium text-gray-600 block mb-1">Class</label>
                           <input 
@@ -467,6 +472,51 @@ const CaptureCard = ({ capture, variantId, partId }) => {
                               placeholder="Enter class"
                           />
                       </div>
+                       <div className="grid grid-cols-2 gap-2 mt-2">
+                               <div>
+                                   <label className="text-xs font-medium text-gray-600 block mb-1">Option Key</label>
+                                   <input 
+                                       type="text"
+                                       className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                       value={moduleEntry.optionKey}
+                                       onChange={e => setModuleEntry({...moduleEntry, optionKey: e.target.value})}
+                                       placeholder="Option key"
+                                   />
+                               </div>
+                               <div>
+                                   <label className="text-xs font-medium text-gray-600 block mb-1">Option Label</label>
+                                   <input 
+                                       type="text"
+                                       className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                       value={moduleEntry.optionLabel}
+                                       onChange={e => setModuleEntry({...moduleEntry, optionLabel: e.target.value})}
+                                       placeholder="Option label"
+                                   />
+                                </div>
+                                <div className="col-span-2 mt-2">
+                                    <label className="text-xs font-medium text-gray-600 block mb-1">Master Option Key</label>
+                                    <input 
+                                        type="text"
+                                        className="w-full p-1.5 text-sm border rounded focus:ring-1 focus:ring-teal-500"
+                                        value={moduleEntry.masterKey}
+                                        onChange={e => setModuleEntry({...moduleEntry, masterKey: e.target.value})}
+                                        placeholder="Master Option Key"
+                                    />
+                                </div>
+                                <div className="col-span-2 flex items-center gap-2 mt-2">
+                                  <input 
+                                      type="checkbox"
+                                      id="detEntryUserSelectable"
+                                      className="w-4 h-4 text-teal-600 border-gray-300 rounded focus:ring-teal-500"
+                                      checked={moduleEntry.isUserSelectable}
+                                      onChange={e => setModuleEntry({...moduleEntry, isUserSelectable: e.target.checked})}
+                                  />
+                                  <label htmlFor="detEntryUserSelectable" className="text-xs font-medium text-gray-600">
+                                      Is User Selectable
+                                  </label>
+                              </div>
+                          </div>
+                      </>
                    )}
                    
                    <button onClick={handleAddModuleEntry} className="w-full mt-2 text-xs text-white bg-teal-600 hover:bg-teal-700 px-3 py-2 rounded font-medium flex items-center justify-center gap-1 transition-colors">

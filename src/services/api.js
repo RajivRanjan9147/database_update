@@ -234,6 +234,10 @@ export const addDetectionClassEntry = async (data) => {
     const payload = {
         detection_config_id: data.detection_config_id,
         class: data.class,
+        option_key: data.option_key,
+        option_label: data.option_label,
+        is_user_selectable: data.is_user_selectable,
+        master_option_keys: data.master_option_keys,
     };
 
     const response = await fetch(`${API_URL}/detection-configs/detection-class`, {
