@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { fetchParts, createPart } from '../services/api';
 import { Plus, Loader2, Check, X } from 'lucide-react';
 import Capture from './Capture';
+import FetchAllPanel from './FetchAllPanel';
 
 const Parts = ({ selectedVariant }) => {
   const [parts, setParts] = useState([]);
@@ -135,6 +136,13 @@ const Parts = ({ selectedVariant }) => {
       {selectedPart && (
         <div className="mt-6 border-t border-gray-100 pt-6">
            <Capture partId={selectedPart.id} variantId={selectedVariant.id} />
+        </div>
+      )}
+
+      {/* Fetch All panel – always visible once parts are loaded */}
+      {parts.length > 0 && (
+        <div className="mt-6 border-t border-gray-100 pt-6">
+          <FetchAllPanel variantId={selectedVariant.id} parts={parts} />
         </div>
       )}
     </div>

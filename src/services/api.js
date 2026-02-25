@@ -375,12 +375,20 @@ export const fetchModuleGT = async (module) => {
             const response = await apiFetch(`${API_URL}/ocr-configs/${module.ocr_config_id}/ground-truth`);
             if (!response.ok) return [];
             const json = await response.json();
-            return Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+            // Response: { data: { id, ground_truths: [...] } }
+            if (Array.isArray(json?.data?.ground_truths)) return json.data.ground_truths;
+            if (Array.isArray(json?.data)) return json.data;
+            if (Array.isArray(json)) return json;
+            return [];
         } else if (module.type === 'Detection' && module.detection_config_id) {
             const response = await apiFetch(`${API_URL}/detection-configs/${module.detection_config_id}/ground-truth`);
             if (!response.ok) return [];
             const json = await response.json();
-            return Array.isArray(json?.data) ? json.data : (Array.isArray(json) ? json : []);
+            // Response: { data: { id, ground_truths: [...] } }
+            if (Array.isArray(json?.data?.ground_truths)) return json.data.ground_truths;
+            if (Array.isArray(json?.data)) return json.data;
+            if (Array.isArray(json)) return json;
+            return [];
         }
     } catch (e) {
         console.warn('fetchModuleGT failed', e);
@@ -403,4 +411,54 @@ export const mapModelToClass = async (modelId, classId) => {
         throw new Error(err?.data?.message || err?.message || 'Failed to map model to class');
     }
     return response.json();
+};
+
+/**
+ * Fetch everything for one part:
+ *   captures → modules per capture → GT entries per module
+ *
+ * Returns:
+ * {
+ *   partId, partName,
+ *   captures: [
+ *     {
+ *       capture,
+ *       modules: [
+ *         { module, gtEntries: [...] }
+ *       ]
+ *     }
+ *   ]
+ * }
+ */
+export const fetchAllForPart = async (variantId, part) => {
+    const captures = await fetchCaptures(variantId, part.id);
+
+    const captureResults = await Promise.all(
+        (captures || []).map(async (capture) => {
+            const modules = await fetchModulesByCaptureId(capture.id);
+
+            const moduleResults = await Promise.all(
+                (modules || []).map(async (module) => {
+                    const gtEntries = await fetchModuleGT(module);
+                    return { module, gtEntries: gtEntries || [] };
+                })
+            );
+
+            return { capture, modules: moduleResults };
+        })
+    );
+
+    return {
+        partId: part.id,
+        partName: part.part_name,
+        captures: captureResults,
+    };
+};
+
+/**
+ * Fetch everything for all parts of a variant concurrently.
+ * Returns an array of fetchAllForPart results.
+ */
+export const fetchAllForVariant = async (variantId, parts) => {
+    return Promise.all((parts || []).map((part) => fetchAllForPart(variantId, part)));
 };
