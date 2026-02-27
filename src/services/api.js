@@ -370,8 +370,9 @@ export const mapClassToModule = async (moduleId, payload) => {
  */
 export const fetchModuleGT = async (module) => {
     if (!module) return [];
+    const type = (module.type || '').toLowerCase();
     try {
-        if (module.type === 'OCR' && module.ocr_config_id) {
+        if (type === 'ocr' && module.ocr_config_id) {
             const response = await apiFetch(`${API_URL}/ocr-configs/${module.ocr_config_id}/ground-truth`);
             if (!response.ok) return [];
             const json = await response.json();
@@ -380,7 +381,7 @@ export const fetchModuleGT = async (module) => {
             if (Array.isArray(json?.data)) return json.data;
             if (Array.isArray(json)) return json;
             return [];
-        } else if (module.type === 'Detection' && module.detection_config_id) {
+        } else if (type === 'detection' && module.detection_config_id) {
             const response = await apiFetch(`${API_URL}/detection-configs/${module.detection_config_id}/ground-truth`);
             if (!response.ok) return [];
             const json = await response.json();

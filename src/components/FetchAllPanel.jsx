@@ -8,7 +8,7 @@ import { ChevronDown, ChevronRight, Loader2, RefreshCw, AlertCircle } from 'luci
 const fullId = (id) => (id ? String(id) : '—');
 
 const ModuleIcon = ({ type }) =>
-  type === 'OCR' ? (
+  (type || '').toLowerCase() === 'ocr' ? (
     <span className="inline-block w-2.5 h-2.5 rounded-sm bg-blue-500 mr-1.5 flex-shrink-0" title="OCR" />
   ) : (
     <span className="inline-block w-2.5 h-2.5 rounded-sm bg-orange-500 mr-1.5 flex-shrink-0" title="Detection" />
@@ -17,7 +17,8 @@ const ModuleIcon = ({ type }) =>
 // ─── GT rows ────────────────────────────────────────────────────────────────
 
 const GtRow = ({ gt, type }) => {
-  if (type === 'OCR') {
+  const t = (type || '').toLowerCase();
+  if (t === 'ocr') {
     return (
       <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-xs text-gray-600 pl-4 py-0.5 border-l-2 border-blue-100 ml-3">
         {gt.option_key && <span><span className="text-gray-400">key:</span> <code className="font-mono">{gt.option_key}</code></span>}
@@ -42,13 +43,13 @@ const GtRow = ({ gt, type }) => {
 
 const GtChips = ({ gtEntries, type }) => {
   const labels = gtEntries
-    .map((gt) => (type === 'OCR' ? gt.value : gt.option_label))
+    .map((gt) => ((type || '').toLowerCase() === 'ocr' ? gt.value : gt.option_label))
     .filter(Boolean);
 
   if (labels.length === 0) return null;
 
   const chipClass =
-    type === 'OCR'
+    (type || '').toLowerCase() === 'ocr'
       ? 'bg-blue-50 text-blue-700 border border-blue-200'
       : 'bg-orange-50 text-orange-700 border border-orange-200';
 
@@ -79,7 +80,7 @@ const ModuleBlock = ({ moduleData }) => {
         <ModuleIcon type={module.type} />
         <span>
           Module #{module.order} –{' '}
-          <span className={module.type === 'OCR' ? 'text-blue-700' : 'text-orange-700'}>{module.type}</span>
+          <span className={(module.type || '').toLowerCase() === 'ocr' ? 'text-blue-700' : 'text-orange-700'}>{module.type}</span>
         </span>
         <span className="font-mono text-gray-400 text-xs">(id: {fullId(module.id)})</span>
         <GtChips gtEntries={gtEntries} type={module.type} />
